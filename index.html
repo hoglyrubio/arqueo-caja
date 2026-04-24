@@ -502,6 +502,129 @@
   }
   .persona-entry input:focus { background: #fffbf0; }
 
+  /* ─── MODAL FIRMA ─────────────────────────────────────── */
+  #sig-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    z-index: 300;
+    align-items: center;
+    justify-content: center;
+  }
+  #sig-modal-overlay.open { display: flex; }
+
+  #sig-modal {
+    background: white;
+    border-radius: 8px;
+    padding: 1.4rem 1.6rem 1.2rem;
+    width: min(92vw, 480px);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.28);
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+
+  #sig-modal-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  #sig-modal-subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: -0.5rem;
+  }
+
+  #sig-canvas-wrap {
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    background: #fdfcf9;
+    overflow: hidden;
+    touch-action: none;
+    position: relative;
+  }
+
+  #sig-canvas-wrap::after {
+    content: 'Firme aquí';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    color: #ddd;
+    letter-spacing: 0.1em;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  #sig-canvas-wrap.signed::after { opacity: 0; }
+
+  #sig-canvas {
+    display: block;
+    width: 100%;
+    height: 160px;
+    cursor: crosshair;
+  }
+
+  .sig-modal-actions {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: flex-end;
+  }
+
+  .sig-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    padding: 0.45rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .sig-btn-clear  { background: var(--cream); color: var(--muted); border: 1px solid var(--border); }
+  .sig-btn-clear:hover  { background: #e8e0d0; }
+  .sig-btn-cancel { background: var(--cream); color: var(--muted); border: 1px solid var(--border); }
+  .sig-btn-cancel:hover { background: #e8e0d0; }
+  .sig-btn-save   { background: var(--ink); color: white; }
+  .sig-btn-save:hover   { background: #2c2c4e; }
+
+  /* Firma guardada en la entrada de persona */
+  .firma-img-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0 0.4rem;
+  }
+  .firma-img-wrap img {
+    height: 32px;
+    max-width: 90px;
+    object-fit: contain;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: white;
+  }
+  .firma-sign-btn {
+    background: none;
+    border: 1.5px dashed var(--border);
+    border-radius: 4px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    padding: 0.28rem 0.6rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .firma-sign-btn:hover { border-color: var(--gold); color: var(--gold); }
+
   /* PRINT BUTTON */
   .print-btn {
     display: block;
@@ -727,6 +850,24 @@
 
 </div>
 
+<!-- FIRMA MODAL -->
+<div id="sig-modal-overlay">
+  <div id="sig-modal">
+    <div>
+      <div id="sig-modal-title">Firma</div>
+      <div id="sig-modal-subtitle"></div>
+    </div>
+    <div id="sig-canvas-wrap">
+      <canvas id="sig-canvas"></canvas>
+    </div>
+    <div class="sig-modal-actions">
+      <button class="sig-btn sig-btn-clear" onclick="sigClear()">Borrar</button>
+      <button class="sig-btn sig-btn-cancel" onclick="sigCancel()">Cancelar</button>
+      <button class="sig-btn sig-btn-save" onclick="sigSave()">Guardar firma</button>
+    </div>
+  </div>
+</div>
+
 <!-- PRINT PREVIEW -->
 <div id="print-preview" onclick="handleOverlayClick(event)">
   <button id="print-close-x" onclick="closePrint()" title="Cerrar">✕</button>
@@ -891,9 +1032,16 @@ function renderPersonas() {
   personasData.forEach(p => {
     const div = document.createElement('div');
     div.className = 'persona-entry';
+    const firmaHtml = p.firma
+      ? `<div class="firma-img-wrap">
+           <img src="${p.firma}" alt="firma" title="Firma guardada">
+           <button class="firma-sign-btn" onclick="openSigModal(${p.id})" title="Volver a firmar">✎</button>
+         </div>`
+      : `<button class="firma-sign-btn" onclick="openSigModal(${p.id})">✍ Firmar</button>`;
     div.innerHTML = `
       <span class="role-tag ${p.rol}">${rolLabel[p.rol]}</span>
       <input type="text" value="${escHtml(p.nombre)}" oninput="updatePersona(${p.id},this.value)">
+      ${firmaHtml}
       <button class="del-btn" onclick="deletePersona(${p.id})" style="padding:0 0.6rem" title="Eliminar">✕</button>
     `;
     list.appendChild(div);
@@ -989,15 +1137,20 @@ function openPrint() {
   }).filter(Boolean).join('');
   if (!monedaRows) monedaRows = '<tr><td colspan="3" style="padding:2px 4px;color:#999;font-style:italic;font-size:0.68rem">Sin monedas</td></tr>';
 
-  // Firmas con espacio generoso
+  // Firmas: imagen si existe, espacio en blanco si no
   let firmasHtml = personasData.length > 0
-    ? personasData.map(p => `
-        <div style="margin-bottom:14px">
-          <div style="height:38px"></div>
-          <div style="border-bottom:1px solid #333;margin-bottom:4px"></div>
+    ? personasData.map(p => {
+        const sigContent = p.firma
+          ? `<img src="${p.firma}" style="height:36px;max-width:130px;object-fit:contain;display:block;background:white;border-radius:2px">`
+          : `<div style="height:36px"></div>`;
+        return `
+        <div style="margin-bottom:12px;break-inside:avoid">
+          ${sigContent}
+          <div style="border-bottom:1px solid #333;margin-bottom:3px;margin-top:1px"></div>
           <div style="font-size:0.72rem;font-weight:500">${escHtml(p.nombre)}</div>
           <div style="font-size:0.58rem;text-transform:uppercase;letter-spacing:0.07em;color:#888;margin-top:1px">${rolLabel[p.rol]}</div>
-        </div>`).join('')
+        </div>`;
+      }).join('')
     : '<p style="color:#999;font-style:italic;font-size:0.72rem">Sin personas registradas</p>';
 
   const html = `
@@ -1131,6 +1284,89 @@ function handleOverlayClick(e) {
   }
 }
 
+
+// ─── FIRMA / SIGNATURE PAD ──────────────────────────────
+let sigPad = null;
+let sigCurrentId = null;
+
+function openSigModal(personaId) {
+  sigCurrentId = personaId;
+  const p = personasData.find(x => x.id === personaId);
+  document.getElementById('sig-modal-title').textContent = p ? p.nombre : 'Firma';
+  document.getElementById('sig-modal-subtitle').textContent = p ? rolLabel[p.rol] : '';
+
+  const overlay = document.getElementById('sig-modal-overlay');
+  const wrap    = document.getElementById('sig-canvas-wrap');
+  const canvas  = document.getElementById('sig-canvas');
+
+  overlay.classList.add('open');
+  wrap.classList.remove('signed');
+
+  // Wait one frame so the modal is painted and has real dimensions
+  requestAnimationFrame(() => {
+    const W = wrap.clientWidth;
+    const H = 160; // fixed logical height in px
+    const DPR = window.devicePixelRatio || 1;
+
+    canvas.width  = W * DPR;
+    canvas.height = H * DPR;
+    canvas.style.width  = W + 'px';
+    canvas.style.height = H + 'px';
+
+    if (sigPad) sigPad.off();
+    sigPad = new SignaturePad(canvas, {
+      penColor: '#1a1a2e',
+      backgroundColor: '#fdfcf9',
+      minWidth: 1.2,
+      maxWidth: 3,
+    });
+
+    sigPad.addEventListener('beginStroke', () => {
+      wrap.classList.add('signed');
+    });
+
+    // Load existing signature if present
+    if (p && p.firma) {
+      const img = new Image();
+      img.onload = () => {
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        wrap.classList.add('signed');
+      };
+      img.src = p.firma;
+    }
+  });
+}
+
+function sigClear() {
+  if (sigPad) sigPad.clear();
+  document.getElementById('sig-canvas-wrap').classList.remove('signed');
+}
+
+function sigCancel() {
+  document.getElementById('sig-modal-overlay').classList.remove('open');
+  sigCurrentId = null;
+}
+
+function sigSave() {
+  if (!sigPad || sigPad.isEmpty()) {
+    sigCancel();
+    return;
+  }
+  // Export trimmed transparent PNG for a clean signature image
+  const dataUrl = sigPad.toDataURL('image/png');
+  const p = personasData.find(x => x.id === sigCurrentId);
+  if (p) p.firma = dataUrl;
+  document.getElementById('sig-modal-overlay').classList.remove('open');
+  sigCurrentId = null;
+  renderPersonas();
+}
+
+// Close modal on overlay click
+document.getElementById('sig-modal-overlay').addEventListener('click', function(e) {
+  if (e.target === this) sigCancel();
+});
+
 // ─── UTIL ───────────────────────────────────────────────
 function escHtml(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -1234,6 +1470,7 @@ buildDenomGrid();
 renderPersonas();
 addSobre(); // start with one row
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/signature_pad/4.1.7/signature_pad.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </body>
