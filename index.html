@@ -131,6 +131,25 @@
   .sobre-table th:last-child, .sobre-table td:last-child { text-align: right; }
   .sobre-table th:first-child, .sobre-table td:first-child { width: 50px; text-align: center; }
 
+  .sobre-table .col-consig { width: 80px; text-align: center; }
+  .sobre-table tr.es-consignacion td { color: var(--muted); }
+  .sobre-table tr.es-consignacion input { color: var(--muted); text-decoration: line-through; }
+  .consig-check { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+  .consig-badge {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.58rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: #eef2ff;
+    color: #3949ab;
+    border: 1px solid #c5cae9;
+    border-radius: 3px;
+    padding: 1px 5px;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+
   .sobre-table td {
     padding: 0.35rem 0.6rem;
     border-bottom: 1px solid #ebe5d8;
@@ -571,6 +590,7 @@
     width: 100%;
     height: 160px;
     cursor: crosshair;
+    touch-action: none;
   }
 
   .sig-modal-actions {
@@ -770,6 +790,7 @@
         <tr>
           <th>#</th>
           <th style="text-align:right">Valor (COP)</th>
+          <th class="col-consig" title="Marcar si el sobre es soporte de consignación bancaria (no trae efectivo)">Consig.</th>
           <th style="width:32px"></th>
         </tr>
       </thead>
@@ -927,7 +948,7 @@ function parseVal(s) {
 function addSobre() {
   sobreCounter++;
   const id = sobreCounter;
-  sobresData.push({ id, sobre: '', valor: 0 });
+  sobresData.push({ id, sobre: '', valor: 0, esConsignacion: false });
   renderSobres();
   setTimeout(() => {
     const inp = document.getElementById(`sobre-val-${id}`);
@@ -946,9 +967,11 @@ function renderSobres() {
   tbody.innerHTML = '';
   sobresData.forEach((row, i) => {
     const tr = document.createElement('tr');
+    if (row.esConsignacion) tr.classList.add('es-consignacion');
     tr.innerHTML = `
-      <td class="row-num" style="text-align:center">Sobre ${i + 1}</td>
-      <td><input type="number" id="sobre-val-${row.id}" value="${row.valor || ''}" placeholder="0" min="0" step="100" style="text-align:right" oninput="updateSobre(${row.id},this.value)"></td>
+      <td class="row-num" style="text-align:center">Sobre ${i + 1}${row.esConsignacion ? '<span class="consig-badge">Consig.</span>' : ''}</td>
+      <td><input type="number" id="sobre-val-${row.id}" value="${row.valor || ''}" placeholder="0" min="0" step="100" style="text-align:right" oninput="updateSobre(${row.id},this.value)" ${row.esConsignacion ? 'title="Soporte de consignación — no se suma al total"' : ''}></td>
+      <td class="col-consig"><input type="checkbox" class="consig-check" ${row.esConsignacion ? 'checked' : ''} onchange="toggleConsignacion(${row.id},this.checked)" title="Marcar como soporte de consignación"></td>
       <td><button class="del-btn" onclick="deleteSobre(${row.id})" title="Eliminar">✕</button></td>
     `;
     tbody.appendChild(tr);
@@ -961,6 +984,13 @@ function updateSobre(id, val) {
   if (!row) return;
   row.valor = parseVal(val);
   recalc();
+}
+
+function toggleConsignacion(id, checked) {
+  const row = sobresData.find(r => r.id === id);
+  if (!row) return;
+  row.esConsignacion = checked;
+  renderSobres();
 }
 
 // ─── DENOMINACIONES ─────────────────────────────────────
@@ -1055,8 +1085,8 @@ function updatePersona(id, val) {
 
 // ─── RECALC ─────────────────────────────────────────────
 function recalc() {
-  // Sobres total
-  const totalSobres = sobresData.reduce((s, r) => s + (r.valor || 0), 0);
+  // Sobres total (excluye sobres de consignación)
+  const totalSobres = sobresData.reduce((s, r) => s + (r.esConsignacion ? 0 : (r.valor || 0)), 0);
   document.getElementById('sobre-total').textContent = fmt(totalSobres);
   document.getElementById('total-sobres-disp').textContent = fmt(totalSobres);
 
@@ -1101,7 +1131,7 @@ function recalc() {
 
 // ─── IMPRESIÓN ──────────────────────────────────────────
 function openPrint() {
-  const totalSobres = sobresData.reduce((s, r) => s + (r.valor || 0), 0);
+  const totalSobres = sobresData.reduce((s, r) => s + (r.esConsignacion ? 0 : (r.valor || 0)), 0);
   const totalBilletes = billetes.reduce((s,d) => s + (d * (denomData[d]||0)), 0);
   const totalMonedas  = monedas.reduce((s,d)  => s + (d * (denomData[d]||0)), 0);
   const totalEfectivo = totalBilletes + totalMonedas;
@@ -1118,7 +1148,12 @@ function openPrint() {
 
   // Sobres rows (solo consecutivo + valor)
   let sobresRows = sobresData.length > 0
-    ? sobresData.map((r,i) => `<tr><td style="padding:2px 6px;color:#444;font-size:0.72rem;border-bottom:1px solid #eee">Sobre ${i+1}</td><td style="padding:2px 6px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;border-bottom:1px solid #eee">${fmt(r.valor)}</td></tr>`).join('')
+    ? sobresData.map((r,i) => {
+        if (r.esConsignacion) {
+          return `<tr style="background:#f5f7ff"><td style="padding:2px 6px;color:#7986cb;font-size:0.72rem;border-bottom:1px solid #eee">Sobre ${i+1} <span style="font-size:0.58rem;background:#eef2ff;color:#3949ab;border:1px solid #c5cae9;border-radius:2px;padding:0 3px;letter-spacing:0.04em">CONSIG.</span></td><td style="padding:2px 6px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;border-bottom:1px solid #eee;color:#9fa8da;text-decoration:line-through">${fmt(r.valor)}</td></tr>`;
+        }
+        return `<tr><td style="padding:2px 6px;color:#444;font-size:0.72rem;border-bottom:1px solid #eee">Sobre ${i+1}</td><td style="padding:2px 6px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;border-bottom:1px solid #eee">${fmt(r.valor)}</td></tr>`;
+      }).join('')
     : '<tr><td colspan="2" style="padding:6px 8px;color:#999;font-style:italic">Sin registros</td></tr>';
 
   // Billetes
@@ -1297,45 +1332,55 @@ function openSigModal(personaId) {
 
   const overlay = document.getElementById('sig-modal-overlay');
   const wrap    = document.getElementById('sig-canvas-wrap');
-  const canvas  = document.getElementById('sig-canvas');
+
+  if (sigPad) { sigPad.off(); sigPad = null; }
 
   overlay.classList.add('open');
   wrap.classList.remove('signed');
 
-  // Wait one frame so the modal is painted and has real dimensions
-  requestAnimationFrame(() => {
-    const W = wrap.clientWidth;
-    const H = 160; // fixed logical height in px
-    const DPR = window.devicePixelRatio || 1;
+  // setTimeout en lugar de rAF: en browsers móviles (iOS Safari, Chrome Android)
+  // el rAF puede disparar antes de que el modal fixed termine su primer layout,
+  // devolviendo clientWidth=0 y dejando el canvas con dimensiones incorrectas.
+  // 60ms garantiza al menos un frame pintado en cualquier dispositivo.
+  setTimeout(() => sigSetupCanvas(p), 60);
+}
 
-    canvas.width  = W * DPR;
-    canvas.height = H * DPR;
-    canvas.style.width  = W + 'px';
-    canvas.style.height = H + 'px';
+function sigSetupCanvas(p) {
+  const canvas = document.getElementById('sig-canvas');
+  const wrap   = document.getElementById('sig-canvas-wrap');
 
-    if (sigPad) sigPad.off();
-    sigPad = new SignaturePad(canvas, {
-      penColor: '#1a1a2e',
-      backgroundColor: '#fdfcf9',
-      minWidth: 1.2,
-      maxWidth: 3,
-    });
+  // getBoundingClientRect es más fiable que clientWidth en elementos fixed
+  const rect = wrap.getBoundingClientRect();
+  const cssW = rect.width || (window.innerWidth * 0.88 - 48); // fallback por si acaso
+  const cssH = 160;
+  const DPR  = Math.max(window.devicePixelRatio || 1, 1);
 
-    sigPad.addEventListener('beginStroke', () => {
-      wrap.classList.add('signed');
-    });
+  canvas.width  = Math.round(cssW * DPR);
+  canvas.height = Math.round(cssH * DPR);
+  canvas.style.width  = cssW + 'px';
+  canvas.style.height = cssH + 'px';
 
-    // Load existing signature if present
-    if (p && p.firma) {
-      const img = new Image();
-      img.onload = () => {
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        wrap.classList.add('signed');
-      };
-      img.src = p.firma;
-    }
+  sigPad = new SignaturePad(canvas, {
+    penColor: '#1a1a2e',
+    backgroundColor: '#fdfcf9',
+    minWidth: 1.2,
+    maxWidth: 3,
   });
+
+  sigPad.addEventListener('beginStroke', () => {
+    wrap.classList.add('signed');
+  });
+
+  // Cargar firma existente: dibujar en espacio CSS (cssW × cssH), no en pixels
+  // físicos, porque SignaturePad ya escaló el contexto por DPR en su constructor.
+  if (p && p.firma) {
+    const img = new Image();
+    img.onload = () => {
+      canvas.getContext('2d').drawImage(img, 0, 0, cssW, cssH);
+      wrap.classList.add('signed');
+    };
+    img.src = p.firma;
+  }
 }
 
 function sigClear() {
