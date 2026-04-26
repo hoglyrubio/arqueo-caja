@@ -29,3 +29,5 @@ Banner en tiempo real: Total Sobres (excluye consignación) vs Total Efectivo �
 ## SignaturePad — notas móvil
 
 El modal de firma usa `setTimeout(60ms)` en lugar de `requestAnimationFrame` para garantizar que el elemento `position: fixed` esté pintado antes de medir el canvas. El tamaño se lee con `getBoundingClientRect()`. La firma existente se dibuja en espacio CSS (no físico) porque SignaturePad ya escala el contexto por `devicePixelRatio` en su constructor.
+
+**Escala HiDPI (crítico en iOS/Android):** SignaturePad v4 NO aplica `ctx.scale(DPR)` internamente — es responsabilidad del consumidor. El canvas se inicializa con dimensiones físicas (`cssW * DPR`) y luego se aplica `ctx.scale(DPR, DPR)` manualmente antes de crear el SignaturePad. Sin este paso, los trazos se dibujan en coordenadas físicas sobre un canvas mostrado a escala CSS, comprimiéndolos a `1/DPR` hacia la esquina superior izquierda (invisible en desktop DPR=1, severo en móvil DPR=2–3).

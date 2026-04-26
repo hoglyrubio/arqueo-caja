@@ -1359,6 +1359,10 @@ function sigSetupCanvas(p) {
   canvas.height = Math.round(cssH * DPR);
   canvas.style.width  = cssW + 'px';
   canvas.style.height = cssH + 'px';
+  // SignaturePad v4 NO aplica ctx.scale internamente; el consumidor debe hacerlo.
+  // Sin este scale, los trazos se dibujan en coords físicas sobre el canvas
+  // escalado por CSS → todo queda comprimido a 1/DPR en la esquina superior izquierda.
+  canvas.getContext('2d').scale(DPR, DPR);
 
   sigPad = new SignaturePad(canvas, {
     penColor: '#1a1a2e',
