@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Arqueo de Caja</title>
+<title>Planilla de Conteo</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -758,7 +758,7 @@
 <div class="app-wrap">
 
   <header>
-    <h1>Arqueo de Caja</h1>
+    <h1>Planilla de Conteo</h1>
     <div class="subtitle">Registro y control de efectivo</div>
   </header>
 
@@ -870,10 +870,8 @@
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.8rem;margin-bottom:2rem">
-    <button class="print-btn" onclick="openPrint()" style="margin-bottom:0">⎙ Vista de impresión</button>
-    <button class="print-btn pdf-btn" onclick="openPdf()" style="margin-bottom:0">🖨 Imprimir carta</button>
-    <button class="print-btn jspdf-btn" onclick="downloadPdf()" style="margin-bottom:0" id="btn-jspdf">⬇ Descargar PDF</button>
+  <div style="display:flex;justify-content:center;margin-bottom:2rem">
+    <button class="print-btn jspdf-btn" onclick="downloadPdf()" style="margin-bottom:0;width:260px" id="btn-jspdf">⬇ Descargar PDF</button>
   </div>
 
 </div>
@@ -1209,7 +1207,7 @@ function openPrint() {
       <!-- ENCABEZADO -->
       <div style="display:flex;align-items:baseline;justify-content:space-between;border-bottom:2px solid #222;padding-bottom:4px;margin-bottom:7px">
         <div>
-          <h1 style="font-family:'Playfair Display',serif;font-size:1.2rem;margin:0;font-weight:700">Arqueo de Caja</h1>
+          <h1 style="font-family:'Playfair Display',serif;font-size:1.2rem;margin:0;font-weight:700">Planilla de Conteo</h1>
           ${entidad ? `<div style="font-family:'IBM Plex Mono',monospace;color:#555;letter-spacing:0.06em;margin-top:2px">${entidad}</div>` : ''}
         </div>
         <span style="color:#555;letter-spacing:0.04em;text-transform:uppercase">${fecha} — ${hora}</span>
