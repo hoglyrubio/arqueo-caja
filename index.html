@@ -423,6 +423,84 @@
     margin-bottom: 0.8rem;
   }
 
+  /* RECIBOS DE CAJA */
+  .recibo-entry {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.75rem;
+    margin-bottom: 0.6rem;
+    background: white;
+  }
+
+  .recibo-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem 0.8rem;
+    margin-bottom: 0.5rem;
+  }
+
+  @media (max-width: 480px) {
+    .recibo-fields { grid-template-columns: 1fr; }
+  }
+
+  .recibo-field label {
+    display: block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    margin-bottom: 0.2rem;
+  }
+
+  .recibo-field input {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.35rem 0.55rem;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.88rem;
+    color: var(--ink);
+    outline: none;
+    background: white;
+    transition: border-color 0.15s;
+  }
+
+  .recibo-field input:focus { border-color: var(--gold); background: #fffbf0; }
+
+  .recibo-textarea {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.35rem 0.55rem;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.88rem;
+    color: var(--ink);
+    outline: none;
+    background: white;
+    resize: vertical;
+    min-height: 3rem;
+    max-height: 7rem;
+    transition: border-color 0.15s;
+  }
+  .recibo-textarea:focus { border-color: var(--gold); background: #fffbf0; }
+
+.recibo-total-box {
+    margin-top: 0.6rem;
+    text-align: right;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.82rem;
+    color: var(--muted);
+    padding-top: 0.5rem;
+    border-top: 2px solid var(--border);
+  }
+
+  .recibo-total-box span {
+    font-size: 0.95rem;
+    color: var(--ink);
+    font-weight: 600;
+  }
+
   .persona-entry {
     display: flex;
     align-items: center;
@@ -829,9 +907,17 @@
     </div>
   </div>
 
-  <!-- SECCIÓN 3: CONSIGNACIÓN -->
+  <!-- SECCIÓN 3: RETIROS PARA CAJA -->
   <div class="section">
-    <div class="section-title"><span class="num">3</span> Consignación</div>
+    <div class="section-title"><span class="num">3</span> Retiros para Caja</div>
+    <div id="recibos-list"></div>
+    <div class="recibo-total-box">Total retiros: <span id="recibos-total">$ 0</span></div>
+    <button class="add-btn" onclick="addRecibo()" style="margin-top:0.6rem">＋ Añadir retiro</button>
+  </div>
+
+  <!-- SECCIÓN 4: CONSIGNACIÓN -->
+  <div class="section">
+    <div class="section-title"><span class="num">4</span> Consignación</div>
     <table class="consig-table">
       <tr>
         <td class="ct-label">Total Billetes</td>
@@ -842,10 +928,8 @@
         <td class="ct-value" id="consig-monedas">$ 0</td>
       </tr>
       <tr class="ct-retiro">
-        <td class="ct-label">Retiro para caja</td>
-        <td class="ct-value">
-          <input type="number" class="retiro-input" id="retiro-caja" min="0" step="100" placeholder="0" oninput="recalc()">
-        </td>
+        <td class="ct-label">Retiro de Caja</td>
+        <td class="ct-value" id="retiro-caja">$ 0</td>
       </tr>
       <tr class="ct-total">
         <td class="ct-label">Total a Consignar</td>
@@ -854,9 +938,9 @@
     </table>
   </div>
 
-  <!-- SECCIÓN 4: PERSONAS -->
+  <!-- SECCIÓN 5: PERSONAS -->
   <div class="section">
-    <div class="section-title"><span class="num">4</span> Personas que diligenciaron</div>
+    <div class="section-title"><span class="num">5</span> Personas que diligenciaron</div>
     <div class="personas-list" id="personas-list"></div>
     <div class="persona-add-row">
       <select class="role-select" id="new-role">
@@ -936,6 +1020,8 @@ let denomData  = {}; // key: denom value, val: cantidad
 let personasData = []; // {id, rol, nombre}
 let sobreCounter = 0;
 let personaCounter = 0;
+let recibosData = []; // {id, departamento, quienRecibe, valor, firma}
+let reciboCounter = 0;
 
 // ─── FORMATEO ───────────────────────────────────────────
 function fmt(n) {
@@ -996,6 +1082,81 @@ function toggleConsignacion(id, checked) {
   if (!row) return;
   row.esConsignacion = checked;
   renderSobres();
+}
+
+// ─── RECIBOS DE CAJA ────────────────────────────────────
+function addRecibo() {
+  reciboCounter++;
+  const id = reciboCounter;
+  recibosData.push({ id, departamento: '', quienRecibe: '', concepto: '', valor: 0, firma: null });
+  renderRecibos();
+}
+
+function deleteRecibo(id) {
+  recibosData = recibosData.filter(r => r.id !== id);
+  renderRecibos();
+}
+
+function updateRecibo(id, field, val) {
+  const r = recibosData.find(x => x.id === id);
+  if (!r) return;
+  r[field] = field === 'valor' ? parseVal(val) : val;
+  if (field === 'valor') recalcRecibos();
+}
+
+function recalcRecibos() {
+  const total = recibosData.reduce((s, r) => s + (r.valor || 0), 0);
+  document.getElementById('recibos-total').textContent = fmt(total);
+  recalc();
+}
+
+function renderRecibos() {
+  const list = document.getElementById('recibos-list');
+  list.innerHTML = '';
+  recibosData.forEach(r => {
+    const div = document.createElement('div');
+    div.className = 'recibo-entry';
+    const firmaHtml = r.firma
+      ? `<div class="firma-img-wrap">
+           <img src="${r.firma}" alt="firma" title="Firma guardada">
+           <button class="firma-sign-btn" onclick="openReciboSig(${r.id})" title="Volver a firmar">✎</button>
+         </div>`
+      : `<button class="firma-sign-btn" onclick="openReciboSig(${r.id})">✍ Firmar</button>`;
+    div.innerHTML = `
+      <div class="recibo-fields">
+        <div class="recibo-field">
+          <label>Departamento</label>
+          <input type="text" value="${escHtml(r.departamento)}" placeholder="Ej: Educación cristiana"
+            oninput="updateRecibo(${r.id},'departamento',this.value)">
+        </div>
+        <div class="recibo-field">
+          <label>Quien recibe</label>
+          <input type="text" value="${escHtml(r.quienRecibe)}" placeholder="Nombre completo"
+            oninput="updateRecibo(${r.id},'quienRecibe',this.value)">
+        </div>
+        <div class="recibo-field" style="grid-column:1/-1">
+          <label>Concepto</label>
+          <textarea maxlength="250" placeholder="Descripción del retiro…"
+            oninput="updateRecibo(${r.id},'concepto',this.value)"
+            class="recibo-textarea">${escHtml(r.concepto)}</textarea>
+        </div>
+        <div class="recibo-field">
+          <label>Valor (COP)</label>
+          <input type="number" value="${r.valor || ''}" placeholder="0" min="0" step="100"
+            style="text-align:right" oninput="updateRecibo(${r.id},'valor',this.value)">
+        </div>
+        <div class="recibo-field" style="display:flex;flex-direction:column;justify-content:flex-end">
+          <label>Firma</label>
+          ${firmaHtml}
+        </div>
+      </div>
+      <div style="text-align:right;margin-top:0.2rem">
+        <button class="del-btn" onclick="deleteRecibo(${r.id})" title="Eliminar retiro">✕</button>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+  recalcRecibos();
 }
 
 // ─── DENOMINACIONES ─────────────────────────────────────
@@ -1103,10 +1264,11 @@ function recalc() {
   document.getElementById('total-efectivo-disp').textContent = fmt(totalEfectivo);
 
   // Consignación
-  const retiro = parseVal(document.getElementById('retiro-caja')?.value || 0);
+  const retiro = recibosData.reduce((s, r) => s + (r.valor || 0), 0);
   const totalConsignar = totalBilletes + totalMonedas - retiro;
   document.getElementById('consig-billetes').textContent = fmt(totalBilletes);
   document.getElementById('consig-monedas').textContent  = fmt(totalMonedas);
+  document.getElementById('retiro-caja').textContent     = fmt(retiro);
   document.getElementById('consig-total').textContent    = fmt(Math.max(0, totalConsignar));
 
   // Cuadre
@@ -1140,7 +1302,7 @@ function openPrint() {
   const totalBilletes = billetes.reduce((s,d) => s + (d * (denomData[d]||0)), 0);
   const totalMonedas  = monedas.reduce((s,d)  => s + (d * (denomData[d]||0)), 0);
   const totalEfectivo = totalBilletes + totalMonedas;
-  const retiro = parseVal(document.getElementById('retiro-caja')?.value || 0);
+  const retiro = recibosData.reduce((s, r) => s + (r.valor || 0), 0);
   const totalConsignar = totalBilletes + totalMonedas - retiro;
   const dif = totalEfectivo - totalSobres;
 
@@ -1338,30 +1500,37 @@ function handleOverlayClick(e) {
 
 // ─── FIRMA / SIGNATURE PAD ──────────────────────────────
 let sigPad = null;
-let sigCurrentId = null;
+let sigContext = null; // {type: 'persona'|'recibo', id: number}
 
-function openSigModal(personaId) {
-  sigCurrentId = personaId;
-  const p = personasData.find(x => x.id === personaId);
-  document.getElementById('sig-modal-title').textContent = p ? p.nombre : 'Firma';
-  document.getElementById('sig-modal-subtitle').textContent = p ? rolLabel[p.rol] : '';
-
+// Shared opener used by both persona and recibo sig flows
+function _openSig(title, subtitle, existingFirma) {
+  document.getElementById('sig-modal-title').textContent = title;
+  document.getElementById('sig-modal-subtitle').textContent = subtitle;
   const overlay = document.getElementById('sig-modal-overlay');
   const wrap    = document.getElementById('sig-canvas-wrap');
-
   if (sigPad) { sigPad.off(); sigPad = null; }
-
   overlay.classList.add('open');
   wrap.classList.remove('signed');
-
   // setTimeout en lugar de rAF: en browsers móviles (iOS Safari, Chrome Android)
   // el rAF puede disparar antes de que el modal fixed termine su primer layout,
   // devolviendo clientWidth=0 y dejando el canvas con dimensiones incorrectas.
   // 60ms garantiza al menos un frame pintado en cualquier dispositivo.
-  setTimeout(() => sigSetupCanvas(p), 60);
+  setTimeout(() => sigSetupCanvas(existingFirma), 60);
 }
 
-function sigSetupCanvas(p) {
+function openSigModal(personaId) {
+  const p = personasData.find(x => x.id === personaId);
+  sigContext = { type: 'persona', id: personaId };
+  _openSig(p ? p.nombre : 'Firma', p ? rolLabel[p.rol] : '', p ? p.firma : null);
+}
+
+function openReciboSig(reciboId) {
+  const r = recibosData.find(x => x.id === reciboId);
+  sigContext = { type: 'recibo', id: reciboId };
+  _openSig(r ? (r.quienRecibe || 'Retiro') : 'Firma', r ? (r.departamento || '') : '', r ? r.firma : null);
+}
+
+function sigSetupCanvas(existingFirma) {
   const canvas = document.getElementById('sig-canvas');
   const wrap   = document.getElementById('sig-canvas-wrap');
 
@@ -1393,13 +1562,13 @@ function sigSetupCanvas(p) {
 
   // Cargar firma existente: dibujar en espacio CSS (cssW × cssH), no en pixels
   // físicos, porque SignaturePad ya escaló el contexto por DPR en su constructor.
-  if (p && p.firma) {
+  if (existingFirma) {
     const img = new Image();
     img.onload = () => {
       canvas.getContext('2d').drawImage(img, 0, 0, cssW, cssH);
       wrap.classList.add('signed');
     };
-    img.src = p.firma;
+    img.src = existingFirma;
   }
 }
 
@@ -1410,7 +1579,7 @@ function sigClear() {
 
 function sigCancel() {
   document.getElementById('sig-modal-overlay').classList.remove('open');
-  sigCurrentId = null;
+  sigContext = null;
 }
 
 function sigSave() {
@@ -1418,13 +1587,16 @@ function sigSave() {
     sigCancel();
     return;
   }
-  // Export trimmed transparent PNG for a clean signature image
   const dataUrl = sigPad.toDataURL('image/png');
-  const p = personasData.find(x => x.id === sigCurrentId);
-  if (p) p.firma = dataUrl;
+  if (sigContext?.type === 'persona') {
+    const p = personasData.find(x => x.id === sigContext.id);
+    if (p) { p.firma = dataUrl; renderPersonas(); }
+  } else if (sigContext?.type === 'recibo') {
+    const r = recibosData.find(x => x.id === sigContext.id);
+    if (r) { r.firma = dataUrl; renderRecibos(); }
+  }
   document.getElementById('sig-modal-overlay').classList.remove('open');
-  sigCurrentId = null;
-  renderPersonas();
+  sigContext = null;
 }
 
 // Close modal on overlay click
@@ -1444,80 +1616,148 @@ async function downloadPdf() {
   btn.disabled = true;
 
   try {
-    // Build the print HTML (same as openPrint but in a hidden div)
+    const now = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    const fechaCorta = `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()}`;
+    const hora       = now.toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' });
+    const entidad    = escHtml(document.getElementById('entidad-nombre').value.trim());
+
+    // Carta: 215.9 x 279.4 mm, margins 20mm → content 175.9 x 239.4 mm
+    const PAGE_W_MM   = 215.9;
+    const PAGE_H_MM   = 279.4;
+    const MARGIN_MM   = 20;
+    const CONTENT_W_MM = PAGE_W_MM - MARGIN_MM * 2;
+    const CONTENT_H_MM = PAGE_H_MM - MARGIN_MM * 2;
+    const DPI         = 150;
+    const MM_TO_PX    = DPI / 25.4;
+    const CONTENT_W_PX = Math.round(CONTENT_W_MM * MM_TO_PX);
+    const CONTENT_H_PX = Math.round(CONTENT_H_MM * MM_TO_PX);
+
+    // ── PÁGINA 1: PLANILLA ──────────────────────────────
     openPrint();
     closePrint();
 
-    // Carta: 215.9 x 279.4 mm, margins 20mm → content 175.9 x 239.4 mm
-    const PAGE_W_MM = 215.9;
-    const PAGE_H_MM = 279.4;
-    const MARGIN_MM = 20;
-    const CONTENT_W_MM = PAGE_W_MM - MARGIN_MM * 2;
-    const CONTENT_H_MM = PAGE_H_MM - MARGIN_MM * 2;
-    const DPI = 150;
-    const MM_TO_PX = DPI / 25.4;
-    const CONTENT_W_PX = Math.round(CONTENT_W_MM * MM_TO_PX);
-
-    // Create off-screen render container
     const wrap = document.createElement('div');
-    wrap.id = 'pdf-render-wrap';
     wrap.style.cssText = [
-      'position:fixed',
-      'left:-9999px',
-      'top:0',
+      'position:fixed','left:-9999px','top:0',
       `width:${CONTENT_W_PX}px`,
-      'background:white',
-      'padding:0',
-      'margin:0',
+      'background:white','padding:0','margin:0',
       'font-family:"IBM Plex Sans",sans-serif',
-      'font-size:10px',
-      'line-height:1.3',
-      'color:#111',
-      'box-sizing:border-box',
+      'font-size:10px','line-height:1.3','color:#111','box-sizing:border-box',
     ].join(';');
-
-    // Inject Google Fonts link so they load in the container context
     wrap.innerHTML = document.getElementById('print-content').innerHTML;
     document.body.appendChild(wrap);
-
-    // Wait a tick for layout
     await new Promise(r => setTimeout(r, 80));
 
-    const canvas = await html2canvas(wrap, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
+    const canvas1 = await html2canvas(wrap, {
+      scale: 2, useCORS: true, allowTaint: true,
       backgroundColor: '#ffffff',
-      width: CONTENT_W_PX,
-      windowWidth: CONTENT_W_PX,
-      logging: false,
+      width: CONTENT_W_PX, windowWidth: CONTENT_W_PX, logging: false,
     });
-
     document.body.removeChild(wrap);
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.92);
-    const imgAspect = canvas.height / canvas.width;
-    const imgH_MM = CONTENT_W_MM * imgAspect;
-
-    // Scale down if taller than content area so it fits in one page
-    let drawW = CONTENT_W_MM;
-    let drawH = imgH_MM;
-    if (drawH > CONTENT_H_MM) {
-      const scale = CONTENT_H_MM / drawH;
-      drawW = drawW * scale;
-      drawH = CONTENT_H_MM;
-    }
-
-    // Center horizontally if scaled down
-    const xOffset = MARGIN_MM + (CONTENT_W_MM - drawW) / 2;
+    const img1     = canvas1.toDataURL('image/jpeg', 0.92);
+    const imgH1_MM = CONTENT_W_MM * (canvas1.height / canvas1.width);
+    let drawW1 = CONTENT_W_MM, drawH1 = imgH1_MM;
+    if (drawH1 > CONTENT_H_MM) { const s = CONTENT_H_MM / drawH1; drawW1 *= s; drawH1 = CONTENT_H_MM; }
+    const xOff1 = MARGIN_MM + (CONTENT_W_MM - drawW1) / 2;
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'mm', format: 'letter', orientation: 'portrait' });
-    doc.addImage(imgData, 'JPEG', xOffset, MARGIN_MM, drawW, drawH);
+    doc.addImage(img1, 'JPEG', xOff1, MARGIN_MM, drawW1, drawH1);
 
-    // Filename: arqueo_YYYY-MM-DD_hhmm.pdf
-    const now = new Date();
-    const pad = n => String(n).padStart(2,'0');
+    // ── PÁGINAS DE RETIROS (si los hay) ─────────────────
+    if (recibosData.length > 0) {
+      const GAP = Math.round(4 * MM_TO_PX);
+      const P   = Math.round(5 * MM_TO_PX); // padding interno tarjeta
+
+      const cards = recibosData.map(r => {
+        const sigHtml = r.firma
+          ? `<img src="${r.firma}" style="height:40px;max-width:100%;object-fit:contain;display:block;margin-bottom:3px;">`
+          : `<div style="height:40px;"></div>`;
+        return `
+          <div style="border:1.5px solid #222;padding:${P}px;box-sizing:border-box;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;
+              border-bottom:1.5px solid #222;padding-bottom:${Math.round(2*MM_TO_PX)}px;
+              margin-bottom:${Math.round(2.5*MM_TO_PX)}px">
+              <span style="font-family:'Playfair Display',serif;font-weight:700;font-size:1.05em">Retiro para Caja</span>
+              ${entidad ? `<span style="font-size:0.75em;color:#555">${entidad}</span>` : ''}
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;
+              margin-bottom:${Math.round(2*MM_TO_PX)}px">
+              <div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:0.62em;text-transform:uppercase;
+                  letter-spacing:0.06em;color:#555;margin-bottom:2px">Fecha</div>
+                <div style="font-size:0.82em">${fechaCorta}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:0.62em;text-transform:uppercase;
+                  letter-spacing:0.06em;color:#555;margin-bottom:2px">Valor</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:1.05em">${fmt(r.valor)}</div>
+              </div>
+            </div>
+            ${r.concepto ? `
+            <div style="margin-bottom:${Math.round(2*MM_TO_PX)}px">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.62em;text-transform:uppercase;
+                letter-spacing:0.06em;color:#555;margin-bottom:2px">Concepto</div>
+              <div style="font-size:0.82em;line-height:1.35">${escHtml(r.concepto)}</div>
+            </div>` : ''}
+            <div style="margin-bottom:${Math.round(2*MM_TO_PX)}px">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.62em;text-transform:uppercase;
+                letter-spacing:0.06em;color:#555;margin-bottom:2px">Departamento</div>
+              <div style="font-size:0.82em">${escHtml(r.departamento) || '—'}</div>
+            </div>
+            <div style="margin-bottom:${Math.round(3*MM_TO_PX)}px">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.62em;text-transform:uppercase;
+                letter-spacing:0.06em;color:#555;margin-bottom:2px">Encargado</div>
+              <div style="font-size:0.82em">${escHtml(r.quienRecibe) || '—'}</div>
+            </div>
+            <div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.62em;text-transform:uppercase;
+                letter-spacing:0.06em;color:#555;margin-bottom:2px">Firma</div>
+              ${sigHtml}
+              <div style="border-bottom:1px solid #333;margin-top:2px;"></div>
+            </div>
+          </div>`;
+      }).join('');
+
+      const rWrap = document.createElement('div');
+      rWrap.style.cssText = [
+        'position:fixed','left:-9999px','top:0',
+        `width:${CONTENT_W_PX}px`,
+        'background:white','padding:0','margin:0','box-sizing:border-box',
+      ].join(';');
+      rWrap.innerHTML = `
+        <div style="font-family:'IBM Plex Sans',sans-serif;color:#111;font-size:20px;line-height:1.4;
+          display:grid;grid-template-columns:1fr 1fr;gap:${GAP}px;">
+          ${cards}
+        </div>`;
+      document.body.appendChild(rWrap);
+      await new Promise(r => setTimeout(r, 100));
+
+      const canvas2 = await html2canvas(rWrap, {
+        scale: 2, useCORS: true, allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: CONTENT_W_PX, windowWidth: CONTENT_W_PX, logging: false,
+      });
+      document.body.removeChild(rWrap);
+
+      // Cortar canvas2 en rebanadas de página
+      const PAGE_H_C = Math.round(CONTENT_H_PX * 2); // scale:2
+      const slices   = Math.ceil(canvas2.height / PAGE_H_C);
+      for (let i = 0; i < slices; i++) {
+        doc.addPage();
+        const srcY  = i * PAGE_H_C;
+        const srcH  = Math.min(PAGE_H_C, canvas2.height - srcY);
+        const sc    = document.createElement('canvas');
+        sc.width    = canvas2.width;
+        sc.height   = srcH;
+        sc.getContext('2d').drawImage(canvas2, 0, srcY, canvas2.width, srcH, 0, 0, canvas2.width, srcH);
+        const sliceH_MM = CONTENT_W_MM * (srcH / canvas2.width);
+        doc.addImage(sc.toDataURL('image/jpeg', 0.92), 'JPEG', MARGIN_MM, MARGIN_MM, CONTENT_W_MM, sliceH_MM);
+      }
+    }
+
     const fname = `arqueo_${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.pdf`;
     doc.save(fname);
 
@@ -1533,6 +1773,7 @@ async function downloadPdf() {
 // ─── INIT ───────────────────────────────────────────────
 buildDenomGrid();
 renderPersonas();
+renderRecibos();
 addSobre(); // start with one row
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/signature_pad/4.1.7/signature_pad.umd.min.js"></script>
